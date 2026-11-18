@@ -85,10 +85,10 @@ export async function handleTransferegovSync(
   try {
     getSupabaseConfig(env);
     // PostgreSQL conditionally updates one state row: competing callers cannot both own the scan.
-    const { data: claim } = await supabaseRequest<SyncClaim | null>(env, "rpc/radar_claim_sync", {
+    const { data: claim } = await supabaseRequest<SyncClaim | null>(env, "rpc/acquire_source_sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_id: leaseId }),
+      body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_owner: leaseId }),
     }, fetchImpl);
     if (!claim) return Response.json({ error: "Já existe uma execução em andamento." }, {
       status: 409, headers: { "Cache-Control": "no-store" },
@@ -113,14 +113,13 @@ export async function handleTransferegovSync(
     };
     // All changes (including expired dates), audit rows, cursor and final withdrawal
     // are committed by one PostgreSQL transaction under the same lease.
-    const { data: committed } = await supabaseRequest<{ changed: number; withdrawn: number }>(
-      env, "rpc/radar_commit_sync", {
+    const { data: committed } = await supabaseRequest<{ changed: number; deactivated: number }>(
+      env, "rpc/commit_source_sync_batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           p_source_id: SOURCE_ID,
-          p_lease_id: leaseId,
-          p_scan_id: claim.scanId,
+          p_lease_owner: leaseId,
           p_rows: slice.result.opportunities.map(toDatabaseRow),
           p_cursor: slice.cursor,
           p_coverage: coverage,
@@ -135,17 +134,17 @@ export async function handleTransferegovSync(
       coverage,
       observed: slice.result.opportunities.length,
       changed: committed.changed,
-      withdrawn: committed.withdrawn,
+      withdrawn: committed.deactivated,
       updatedAt: new Date().toISOString(),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida durante a sincronização.";
     if (claimed) {
       try {
-        await supabaseRequest(env, "rpc/radar_fail_sync", {
+        await supabaseRequest(env, "rpc/fail_source_sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_id: leaseId, p_message: message }),
+          body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_owner: leaseId, p_error: message }),
         }, fetchImpl);
       } catch { /* A lease expires automatically if the database is unavailable. */ }
     }
