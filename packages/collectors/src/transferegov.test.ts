@@ -159,4 +159,23 @@ describe("adaptador Transferegov", () => {
     await expect(fetchOpenTransferegovPrograms({ today, fetchImpl: mockFetch, lookbackYears: 0, maxPagesPerQuery: 1 })).rejects.toThrow("HTTP 400");
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
+  it("não duplica páginas disponíveis ao retomar no meio do mesmo grupo", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      const total = url.searchParams.get("ano_disponibilizacao") === "2026"
+        && url.searchParams.get("natureza_juridica_programa") === "Organização da Sociedade Civil" ? 6 : 1;
+      return Response.json(page([], total));
+    });
+    const first = await fetchTransferegovSlice({ today, maxPages: 2, fetchImpl });
+    expect(first.result.coverage.pagesRead).toBe(2);
+    expect(first.result.coverage.pagesAvailable).toBe(6);
+    const second = await fetchTransferegovSlice({
+      today, cursor: first.cursor, knownGroupTotals: first.result.coverage.groupPageTotals,
+      maxPages: 2, fetchImpl,
+    });
+    expect(second.result.coverage.pagesRead).toBe(2);
+    expect(second.result.coverage.pagesAvailable).toBe(0);
+    expect(first.result.coverage.pagesAvailable + second.result.coverage.pagesAvailable).toBe(6);
+  });
+
 });
