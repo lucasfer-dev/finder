@@ -26,6 +26,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@radar/collectors':
+        specifier: workspace:*
+        version: link:../../packages/collectors
       '@radar/core':
         specifier: workspace:*
         version: link:../../packages/core

@@ -1,18 +1,24 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { HomePage } from "./App.js";
 
 describe("HomePage", () => {
-  it("apresenta a identidade e o estado real da fundação", () => {
+  it("apresenta a identidade e o estado de consulta da fonte oficial", () => {
+    const queryClient = new QueryClient();
     const html = renderToStaticMarkup(
-      <MemoryRouter>
-        <HomePage />
-      </MemoryRouter>,
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <HomePage />
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     expect(html).toContain("Radar de Editais");
     expect(html).toContain("SEPEC");
-    expect(html).toContain("busca de fontes oficiais será conectada na próxima etapa");
+    expect(html).toContain("Oportunidades abertas");
+    expect(html).toContain("Consultando programas com prazo aberto na fonte oficial");
+    expect(html).not.toContain("Edital fictício");
   });
 });

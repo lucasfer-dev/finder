@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "exports": {
+    ".": "./src/source-adapter.ts",
+    "./transferegov": "./src/transferegov.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
