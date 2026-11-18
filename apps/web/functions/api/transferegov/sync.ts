@@ -34,6 +34,8 @@ interface DatabaseOpportunity {
   eligibility_status: string;
   eligibility_criteria: string | null;
   source_data: TransferegovOpportunity;
+  is_active: boolean;
+  inactive_reason: string | null;
 }
 
 const PAGE_BUDGET_PER_RUN = 4;
@@ -63,6 +65,8 @@ function toDatabaseRow(item: TransferegovOpportunity): DatabaseOpportunity {
     eligibility_status: item.eligibilityStatus,
     eligibility_criteria: item.eligibilityCriteria,
     source_data: item,
+    is_active: item.activeInSource,
+    inactive_reason: item.activeInSource ? null : item.deadlineState === "expired" ? "expired_at_source" : "not_open_at_source",
   };
 }
 
