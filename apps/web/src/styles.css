@@ -31,6 +31,9 @@ h1 { max-width: 720px; margin: 0; font-size: clamp(38px, 6vw, 64px); line-height
 .refresh-button, .error-note button { min-height: 42px; padding: 0 16px; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; background: white; font: inherit; font-size: 14px; font-weight: 650; cursor: pointer; }
 .refresh-button:disabled { cursor: wait; opacity: .6; }
 .update-note, .source-caveat, .empty-state { color: #64748b; font-size: 14px; line-height: 1.6; }
+.warning-note { margin: 16px 0; padding: 14px 16px; border: 1px solid #fcd34d; border-radius: 10px; color: #78350f; background: #fffbeb; font-size: 14px; line-height: 1.55; }
+.warning-note details { margin-top: 8px; }
+.warning-note summary { cursor: pointer; font-weight: 700; }
 .empty-state, .error-note { margin: 20px 0; padding: 18px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; }
 .error-note { display: flex; align-items: center; justify-content: space-between; gap: 18px; color: #9f1239; }
 .opportunity-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; margin-top: 22px; }

@@ -1,13 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Link, Route, Routes } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import type { TransferegovOpportunity } from "@radar/collectors/transferegov";
+import type { TransferegovCoverage, TransferegovOpportunity } from "@radar/collectors/transferegov";
 
 const queryClient = new QueryClient();
 
 interface SearchResponse {
   updatedAt: string;
   opportunities: TransferegovOpportunity[];
+  coverage: TransferegovCoverage;
+  cacheStatus: "fresh" | "stale";
+  warning?: string;
   error?: string;
 }
 
@@ -66,20 +69,23 @@ export function HomePage() {
         </div>
         {isPending && <p className="setup-note" role="status">Consultando programas com prazo aberto na fonte oficial…</p>}
         {error && <div className="error-note" role="alert"><span>{error.message}</span><button type="button" onClick={() => void refetch()}>Tentar novamente</button></div>}
-        {data && <p className="update-note" role="status">Consulta realizada em {formatUpdate(data.updatedAt)} · os prazos são conferidos com as datas oficiais de recebimento.</p>}
-        {data?.opportunities.length === 0 && <p className="empty-state">Nenhuma oportunidade aberta foi confirmada neste recorte da API. A busca cobre programas de 2026 para RJ destinados a OSCs e prefeituras.</p>}
+        {data && <p className="update-note" role="status">Dados consultados em {formatUpdate(data.updatedAt)}{data.cacheStatus === "stale" ? " · exibindo última consulta disponível" : ""} · cobertura: {data.coverage.yearsInScope[0]}–{data.coverage.yearsInScope.at(-1)}.</p>}
+        {data?.warning && <p className="warning-note" role="status">{data.warning}</p>}
+        {data && !data.coverage.exhaustive && <div className="warning-note" role="status">Busca histórica parcial. Foram lidas {data.coverage.pagesRead} de {data.coverage.pagesAvailable} páginas conhecidas; alguns programas podem não aparecer.{data.coverage.partialReasons.length > 0 && <details><summary>Detalhes da cobertura</summary><ul>{data.coverage.partialReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul></details>}</div>}
+        {data?.opportunities.length === 0 && <p className="empty-state">Nenhuma oportunidade com prazo confirmado foi encontrada nos dados consultados. A busca cobre o ano atual e os cinco anos anteriores para RJ.</p>}
         <div className="opportunity-list">
           {data?.opportunities.map((item) => (
             <article className="opportunity-card" key={item.id}>
-              <div className="card-meta"><span>{item.recordType === "public_call" ? "Chamamento público" : "Programa de transferência"}</span><span>Prazo confirmado</span></div>
+              <div className="card-meta"><span>{item.publicCallState === "yes" ? "Chamamento público indicado" : item.publicCallState === "no" ? "Sem chamamento indicado" : "Chamamento não informado"}</span><span>Prazo confirmado · aberto</span></div>
               <h3>{item.title}</h3>
               <p className="agency">{item.agency ?? "Órgão não informado"}{item.executingAgency ? ` · ${item.executingAgency}` : ""}</p>
               <dl className="opportunity-details">
-                <div><dt>Público informado</dt><dd>{item.audience ?? "Não informado"}</dd></div>
+                <div><dt>Natureza jurídica na fonte</dt><dd>{item.naturezaJuridica ?? "Não informada"}</dd></div>
                 <div><dt>Recebimento de propostas</dt><dd>{formatDate(item.proposalStart)} até {formatDate(item.deadline)}</dd></div>
+                <div><dt>Elegibilidade da instituição</dt><dd>Não verificada — consulte os critérios e o documento oficial.</dd></div>
               </dl>
               {item.eligibilityCriteria && <p className="criteria">Critérios publicados: {item.eligibilityCriteria}</p>}
-              <a className="official-link" href={item.officialUrl} target="_blank" rel="noreferrer">Conferir registro oficial <span aria-hidden="true">↗</span></a>
+              <a className="official-link" href={item.officialUrl} target="_blank" rel="noreferrer">Abrir consulta técnica na API oficial <span aria-hidden="true">↗</span></a>
             </article>
           ))}
         </div>
