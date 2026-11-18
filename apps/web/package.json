@@ -4,13 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite build && pnpm dlx wrangler@4.164.0 pages dev dist --ip 127.0.0.1 --compatibility-date=2026-11-18",
+    "dev:vite": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {
     "@radar/core": "workspace:*",
+    "@radar/collectors": "workspace:*",
     "@tanstack/react-query": "5.108.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",

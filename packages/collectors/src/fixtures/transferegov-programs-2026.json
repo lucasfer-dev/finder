@@ -1,0 +1,100 @@
+{
+  "_provenance": {
+    "source": "https://api-publica.transferegov.gestao.gov.br/discricionarias/todos-programas",
+    "capturedAt": "2026-11-18",
+    "query": "sit_programa=DISPONIBILIZADO&ano_disponibilizacao=2026&natureza_juridica_programa=Organização da Sociedade Civil&uf_programa=RJ&pagina=1&tamanho_da_pagina=100",
+    "note": "Records are unmodified entries extracted from the official API response; selected by id and UF for a compact test fixture."
+  },
+  "data": [
+    {
+      "id_programa": 56851,
+      "cod_orgao_sup_programa": "26000",
+      "desc_orgao_sup_programa": "MINISTERIO DA EDUCACAO",
+      "orgao_executor": "UNIVERSIDADE FEDERAL RURAL DO RIO DE JANEIRO",
+      "cod_programa": "2624920260003",
+      "ano_programa": "2026",
+      "nome_programa": "Rede multidisciplinar de atenção a mães e familiares vítimas de desaparecimentos forçados e da violência de estado na baixada fluminense",
+      "acao_orcamentaria": "20GK1000",
+      "sit_programa": "DISPONIBILIZADO",
+      "data_disponibilizacao": "2026-10-14",
+      "ano_disponibilizacao": "2026",
+      "dt_prog_ini_receb_prop": "2026-10-14",
+      "dt_prog_fim_receb_prop": "2026-11-13",
+      "expiracao_prog_prop_voluntaria": "PROG_EXPIRADO",
+      "dt_prog_ini_emenda_par": null,
+      "dt_prog_fim_emenda_par": null,
+      "expiracao_prog_emenda_par": null,
+      "dt_prog_ini_benef_esp": null,
+      "dt_prog_fim_benef_esp": null,
+      "expiracao_prog_benef_esp": null,
+      "descricao": "O projeto tem por objetivo oferecer atendimentos psicossocial, jurídico e assistencia social qualificados a mães e familiares de vítimas de violencia estatal e desaparecimentos forçados, incluindo em ambos os casos a violencia na o estatal resultante da conivencia, participação direta ou omissa o do Estado, fortalecendo redes de apoio, analisar pra ticas de cuidado existentes, identificando desafios teoricos e metodologicos, identificar redes de atenção psicosssocial com as quais se possa desenvolver interações e parcerias, e desenvolver ações no campo da arteterapia, escrevive ncia (escrita de histo rias de vida e relatos pelas vítimas da violencia) e oficinas de interação comunitaria.",
+      "observacao": "",
+      "criterios_de_selecao": "",
+      "data_publicacao": "2026-10-14",
+      "chamamento_projeto": "SIM",
+      "emenda": "0",
+      "modalidade_programa": "TERMO DE COLABORACAO",
+      "natureza_juridica_programa": "Organização da Sociedade Civil",
+      "uf_programa": "RJ",
+      "qualificacao_proposta": "Proposta Voluntária",
+      "id_subtipo_programa": null,
+      "modalidade_subtipo_programa": null,
+      "nome_subtipo_programa": null,
+      "descricao_subtipo_programa": null,
+      "ind_projeto_estruturante_calamidade_temp": "NÃO",
+      "modalidade_programa_agrupada": "TERMO DE COLABORACAO",
+      "programas_propostas": [
+        {
+          "id_proposta": 2251942
+        }
+      ]
+    },
+    {
+      "id_programa": 56385,
+      "cod_orgao_sup_programa": "26000",
+      "desc_orgao_sup_programa": "MINISTERIO DA EDUCACAO",
+      "orgao_executor": "FUND.COORD.DE APERF.DE PESSOAL NIVEL SUPERIOR",
+      "cod_programa": "2629120260003",
+      "ano_programa": "2026",
+      "nome_programa": "Ações da Diretoria de Articulação e Inovação em Educação Aberta (DIEA) da Capes - PROEB e Inovação Tecnológica",
+      "acao_orcamentaria": "000020RJ",
+      "sit_programa": "DISPONIBILIZADO",
+      "data_disponibilizacao": "2026-05-03",
+      "ano_disponibilizacao": "2026",
+      "dt_prog_ini_receb_prop": "2026-03-10",
+      "dt_prog_fim_receb_prop": "2026-12-31",
+      "expiracao_prog_prop_voluntaria": "EXPIRACAO_PROG_DISTANTE",
+      "dt_prog_ini_emenda_par": null,
+      "dt_prog_fim_emenda_par": null,
+      "expiracao_prog_emenda_par": null,
+      "dt_prog_ini_benef_esp": null,
+      "dt_prog_fim_benef_esp": null,
+      "expiracao_prog_benef_esp": null,
+      "descricao": "Fomentar exclusivamente as ações promovidas pela Diretoria de Articulação e Inovação em Educação Aberta (DIEA) da Capes, especialmente: - a indução do aprimoramento, da proposição e da disseminação de tecnologias inovadoras nos contextos educacionais, por meio de programas estratégicos na educação superior e na educação profissional e tecnológica; - a disseminação de tecnologias educacionais inovadoras com vistas ao aprimoramento dos profissionais da educação básica e demais agentes públicos.",
+      "observacao": "O programa é especifico para propostas de instituições de ensino partícipes do Programa de Pós-Graduação stricto sensu para Qualificação de Professores da Rede Pública da Educação Básica (PROEB), e dos projetos especiais voltados para a inovação tecnológica em EAD e formação de professores para a educação básica.      ",
+      "criterios_de_selecao": "Instituições de ensino partícipes do Programa de Pós-Graduação stricto sensu para Qualificação de Professores da Rede Pública da Educação Básica (PROEB), e dos projetos especiais voltados para a inovação tecnológica em EAD e formação de professores para a educação básica.    ",
+      "data_publicacao": null,
+      "chamamento_projeto": "NÃO",
+      "emenda": "0",
+      "modalidade_programa": "CONVENIO",
+      "natureza_juridica_programa": "Organização da Sociedade Civil",
+      "uf_programa": "RJ",
+      "qualificacao_proposta": "Proposta Voluntária",
+      "id_subtipo_programa": null,
+      "modalidade_subtipo_programa": null,
+      "nome_subtipo_programa": null,
+      "descricao_subtipo_programa": null,
+      "ind_projeto_estruturante_calamidade_temp": "NÃO",
+      "modalidade_programa_agrupada": "CONVENIO",
+      "programas_propostas": [
+        {
+          "id_proposta": 2221265
+        }
+      ]
+    }
+  ],
+  "total_pages": 4,
+  "total_items": 345,
+  "page_number": 1,
+  "page_size": 100
+}
