@@ -30,4 +30,12 @@ Após aplicar ambas as migrações em um Supabase de desenvolvimento, execute `t
 
 **Limitação:** testes unitários e CI não executam esta migração no PostgreSQL. O fluxo de ponta a ponta só estará validado após aplicar o SQL e executar a suíte no banco de desenvolvimento.
 
-O projeto Supabase e os secrets precisam ser fornecidos/configurados pelo mantenedor; este repositório não contém credenciais nem provisiona um projeto remoto.
+
+## Sincronização agendada
+
+Após publicar a Function e configurar `TRANSFEREGOV_SYNC_TOKEN` como secret nas Pages Functions, configure no GitHub → Settings → Secrets and variables → Actions:
+
+- Variable `RADAR_BASE_URL`: URL base do site publicado, sem barra final.
+- Secret `TRANSFEREGOV_SYNC_TOKEN`: o mesmo token configurado na Pages Function.
+
+O workflow `.github/workflows/transferegov-sync.yml` executa diariamente às 09:23 de Brasília e também aceita execução manual. Ele processa no máximo 30 lotes (quatro páginas por lote), não inicia duas execuções simultâneas, respeita o lease do banco, tenta novamente falhas HTTP e deixa o cursor salvo caso a cobertura continue parcial. Até os dois valores serem configurados, o workflow termina com aviso e não chama a API.

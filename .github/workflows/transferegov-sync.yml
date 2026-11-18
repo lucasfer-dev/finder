@@ -1,0 +1,55 @@
+name: Sincronização Transferegov
+
+on:
+  schedule:
+    - cron: "23 12 * * *" # 09:23 no horário de Brasília
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: radar-transferegov-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      RADAR_BASE_URL: ${{ vars.RADAR_BASE_URL }}
+      TRANSFEREGOV_SYNC_TOKEN: ${{ secrets.TRANSFEREGOV_SYNC_TOKEN }}
+    steps:
+      - name: Continuar a varredura em lotes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "$RADAR_BASE_URL" || -z "$TRANSFEREGOV_SYNC_TOKEN" ]]; then
+            echo "::notice::Configure a variável RADAR_BASE_URL e o secret TRANSFEREGOV_SYNC_TOKEN para ativar a sincronização."
+            exit 0
+          fi
+          response_file="$(mktemp)"
+          trap 'rm -f "$response_file"' EXIT
+          for batch in $(seq 1 30); do
+            if ! status_code="$(curl --silent --show-error --output "$response_file" --write-out '%{http_code}' --max-time 55 --retry 2 --retry-all-errors --retry-delay 1 --request POST "$RADAR_BASE_URL/api/transferegov/sync" --header "Authorization: Bearer $TRANSFEREGOV_SYNC_TOKEN" --header 'Accept: application/json')"; then
+              echo "::error::A chamada de sincronização falhou."
+              exit 1
+            fi
+            if [[ "$status_code" != "200" ]]; then
+              echo "::error::A sincronização respondeu HTTP $status_code."
+              exit 1
+            fi
+            sync_status="$(jq -er '.status' "$response_file")"
+            pages="$(jq -er '.coverage.pagesRead' "$response_file")"
+            echo "Lote $batch: status=$sync_status; páginas percorridas=$pages"
+            if [[ "$sync_status" == "complete" ]]; then
+              echo "Varredura histórica concluída."
+              exit 0
+            fi
+            if [[ "$sync_status" != "partial" ]]; then
+              echo "::error::Estado inesperado na sincronização: $sync_status"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::warning::Limite diário de 30 lotes alcançado; o cursor foi preservado para a próxima execução."
