@@ -13,7 +13,7 @@ interface Context {
 interface SyncClaim {
   scanId: string;
   cursor: TransferegovScanCursor | null;
-  coverage: { pagesRead?: number; pagesAvailable?: number; yearsComplete?: number[] } | null;
+  coverage: { pagesRead?: number; pagesAvailable?: number; yearsComplete?: number[]; groupPageTotals?: Record<string, number> } | null;
 }
 interface DatabaseOpportunity {
   source_id: string;
@@ -101,6 +101,7 @@ export async function handleTransferegovSync(
     const slice = await fetchTransferegovSlice({
       today: brazilToday(),
       cursor: claim.cursor,
+      knownGroupTotals: claim.coverage?.groupPageTotals,
       maxPages: PAGE_BUDGET_PER_RUN,
       baseUrl: env.TRANSFEREGOV_API_URL,
       fetchImpl,
