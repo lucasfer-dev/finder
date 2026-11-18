@@ -56,6 +56,8 @@ A busca de tela usa `/api/opportunities`, que lê oportunidades normalizadas no 
 
 A rota protegida `POST /api/transferegov/sync` consulta páginas em lotes de quatro, salva cada lote e avança um cursor persistido. O cursor preserva o ano-base da busca para que uma sincronização iniciada em dezembro continue na mesma janela histórica após a virada do ano. Continue chamando enquanto o status for `partial`; quando retornar `complete`, a janela histórica foi percorrida. Os registros e as observações ficam nas tabelas `opportunities`, `opportunity_history` e `source_sync_state`.
 
+O workflow [`transferegov-sync.yml`](.github/workflows/transferegov-sync.yml) está preparado para continuar os lotes diariamente e também pode ser iniciado manualmente. Configure `RADAR_BASE_URL` como variável e `TRANSFEREGOV_SYNC_TOKEN` como secret do GitHub Actions após publicar as Pages Functions; sem eles, o workflow apenas registra um aviso.
+
 Para aplicar o banco e configurar variáveis/segredos no servidor, siga [`supabase/README.md`](supabase/README.md). A interface ainda não terá resultados até que a migração, secrets e a primeira sincronização sejam configurados.
 
 Não configure credenciais no código. Use variáveis de ambiente; o arquivo `.env.example` contém apenas nomes de variáveis.

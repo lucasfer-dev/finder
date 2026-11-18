@@ -36,6 +36,12 @@ function brazilToday(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 }
 
+function addBrazilDays(today: string, days: number): string {
+  const date = new Date(`${today}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export async function handleOpportunitiesRequest(
   context: Context,
   fetchImpl: typeof fetch = fetch,
@@ -56,8 +62,12 @@ export async function handleOpportunitiesRequest(
     const query = cleanSearchTerm(url.searchParams.get("q") ?? "");
     const agency = cleanSearchTerm(url.searchParams.get("agency") ?? "");
     const institution = url.searchParams.get("institution");
+    const deadlineWithin = url.searchParams.get("deadlineWithin");
     if (query) params.set("or", `(title.ilike.*${query}*,agency.ilike.*${query}*,eligibility_criteria.ilike.*${query}*)`);
     if (agency) params.set("agency", `ilike.*${agency}*`);
+    if (["3", "7", "15", "30"].includes(deadlineWithin ?? "")) {
+      params.set("and", `(deadline.gte.${brazilToday()},deadline.lte.${addBrazilDays(brazilToday(), Number(deadlineWithin))})`);
+    }
     if (institution === "sepec") params.set("legal_nature", "eq.Administração Pública Municipal");
     if (institution === "vielas") params.set("legal_nature", "eq.Organização da Sociedade Civil");
     const [{ data, response }, { data: states }] = await Promise.all([

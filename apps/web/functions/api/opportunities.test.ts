@@ -33,7 +33,7 @@ describe("GET /api/opportunities", () => {
       return new Response(JSON.stringify([{ status: "complete", coverage: { exhaustive: true }, last_succeeded_at: "2026-11-18T12:00:00.000Z", last_error: null }]), { status: 200 });
     });
     const response = await handleOpportunitiesRequest({
-      request: new Request("https://radar.test/api/opportunities?q=inovação&agency=Ciência&institution=vielas"),
+      request: new Request("https://radar.test/api/opportunities?q=inovação&agency=Ciência&institution=vielas&deadlineWithin=7"),
       env: { SUPABASE_URL: "https://db.example", SUPABASE_SERVICE_ROLE_KEY: "server-secret" },
     }, fetchImpl);
     expect(response.status).toBe(200);
@@ -43,7 +43,7 @@ describe("GET /api/opportunities", () => {
     expect(urls[0]?.searchParams.get("or")).toContain("inovação");
     expect(urls[0]?.searchParams.get("deadline_state")).toBe("eq.open");
     expect(urls[0]?.searchParams.get("is_active")).toBe("eq.true");
-    expect(urls[0]?.searchParams.get("is_active")).toBe("eq.true");
+    expect(urls[0]?.searchParams.get("and")).toMatch(/deadline\.lte\.\d{4}-\d{2}-\d{2}/);
     expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("apikey")).toBe("server-secret");
   });
 

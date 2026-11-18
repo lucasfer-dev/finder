@@ -19,14 +19,40 @@ interface SearchResponse {
   error?: string;
 }
 
-async function getOpportunities(filters: { query: string; agency: string; institution: string; page: number }): Promise<SearchResponse> {
+interface DashboardResponse {
+  updatedAt: string | null;
+  stale: boolean;
+  syncStatus: string;
+  coverage: TransferegovCoverage | null;
+  syncError: string | null;
+  counts: {
+    totalIdentified: number | null;
+    openConfirmed: number | null;
+    due3Days: number | null;
+    due7Days: number | null;
+    due15Days: number | null;
+    due30Days: number | null;
+    expired: number | null;
+    newThisWeek: number | null;
+  };
+}
+
+async function getOpportunities(filters: { query: string; agency: string; institution: string; deadlineWithin: string; page: number }): Promise<SearchResponse> {
   const params = new URLSearchParams({ page: String(filters.page) });
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (filters.agency.trim()) params.set("agency", filters.agency.trim());
   if (filters.institution !== "all") params.set("institution", filters.institution);
+  if (filters.deadlineWithin !== "all") params.set("deadlineWithin", filters.deadlineWithin);
   const response = await fetch(`/api/opportunities?${params}`);
   const data = await response.json() as SearchResponse;
   if (!response.ok) throw new Error(data.error ?? "Não foi possível consultar o Transferegov.");
+  return data;
+}
+
+async function getDashboard(): Promise<DashboardResponse> {
+  const response = await fetch("/api/dashboard");
+  const data = await response.json() as DashboardResponse & { error?: string };
+  if (!response.ok) throw new Error(data.error ?? "Não foi possível carregar o resumo do Radar.");
   return data;
 }
 
@@ -45,10 +71,12 @@ export function HomePage() {
   const [draftQuery, setDraftQuery] = useState("");
   const [draftAgency, setDraftAgency] = useState("");
   const [institution, setInstitution] = useState("all");
+  const [deadlineWithin, setDeadlineWithin] = useState("all");
   const [page, setPage] = useState(1);
+  const dashboard = useQuery({ queryKey: ["dashboard-summary"], queryFn: getDashboard, staleTime: 60_000, retry: 1 });
   const { data, error, isPending, refetch, isFetching } = useQuery({
-    queryKey: ["persisted-opportunities", query, agency, institution, page],
-    queryFn: () => getOpportunities({ query, agency, institution, page }),
+    queryKey: ["persisted-opportunities", query, agency, institution, deadlineWithin, page],
+    queryFn: () => getOpportunities({ query, agency, institution, deadlineWithin, page }),
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -72,6 +100,26 @@ export function HomePage() {
           para a Prefeitura e o Instituto Vielas.
         </p>
       </section>
+      <section className="dashboard" aria-labelledby="dashboard-title">
+        <div className="dashboard-heading"><div><p className="eyebrow">Visão geral · dados persistidos</p><h2 id="dashboard-title">Painel de oportunidades</h2></div>
+          {dashboard.data?.updatedAt && <span className="dashboard-updated">Atualizado {formatUpdate(dashboard.data.updatedAt)}{dashboard.data.stale ? " · desatualizado" : ""}</span>}
+        </div>
+        {dashboard.error && <p className="warning-note" role="alert">{dashboard.error.message}</p>}
+        <div className="metric-grid">
+          <article className="metric-card"><span>Total identificadas</span><strong>{dashboard.data?.counts.totalIdentified ?? "—"}</strong></article>
+          <article className="metric-card metric-card-open"><span>Abertas confirmadas</span><strong>{dashboard.data?.counts.openConfirmed ?? "—"}</strong></article>
+          <article className="metric-card"><span>Novas nos últimos 7 dias</span><strong>{dashboard.data?.counts.newThisWeek ?? "—"}</strong></article>
+          <article className="metric-card metric-card-danger"><span>Prazo encerrado</span><strong>{dashboard.data?.counts.expired ?? "—"}</strong></article>
+        </div>
+        <div className="deadline-alerts" aria-label="Oportunidades próximas do prazo">
+          <p>Prazo confirmado termina em:</p>
+          <span className="alert-critical">até 3 dias <b>{dashboard.data?.counts.due3Days ?? "—"}</b></span>
+          <span className="alert-high">4–7 dias <b>{dashboard.data?.counts.due7Days ?? "—"}</b></span>
+          <span className="alert-medium">8–15 dias <b>{dashboard.data?.counts.due15Days ?? "—"}</b></span>
+          <span className="alert-low">16–30 dias <b>{dashboard.data?.counts.due30Days ?? "—"}</b></span>
+        </div>
+        {dashboard.data && <p className="source-status">Fonte Transferegov · sincronização: <strong>{dashboard.data.syncStatus}</strong>{dashboard.data.coverage && !dashboard.data.coverage.exhaustive ? " · cobertura histórica parcial" : ""}</p>}
+      </section>
       <section className="opportunities" aria-labelledby="opportunities-title">
         <div className="section-heading">
           <div>
@@ -86,6 +134,7 @@ export function HomePage() {
           <label>Palavra-chave<input value={draftQuery} onChange={(event) => setDraftQuery(event.target.value)} placeholder="Tema, projeto ou público" /></label>
           <label>Órgão concedente<input value={draftAgency} onChange={(event) => setDraftAgency(event.target.value)} placeholder="Nome do órgão" /></label>
           <label>Perfil de análise<select value={institution} onChange={(event) => { setInstitution(event.target.value); setPage(1); }}><option value="all">Todos</option><option value="sepec">Prefeitura / SEPEC</option><option value="vielas">Instituto Vielas</option></select></label>
+          <label>Prazo restante<select value={deadlineWithin} onChange={(event) => { setDeadlineWithin(event.target.value); setPage(1); }}><option value="all">Qualquer prazo aberto</option><option value="3">Até 3 dias</option><option value="7">Até 7 dias</option><option value="15">Até 15 dias</option><option value="30">Até 30 dias</option></select></label>
           <button className="refresh-button" type="submit">Buscar</button>
         </form>
         {isPending && <p className="setup-note" role="status">Consultando oportunidades persistidas…</p>}
