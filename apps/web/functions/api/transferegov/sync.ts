@@ -10,7 +10,7 @@ interface Context { request: Request; env?: SupabaseEnv & { TRANSFEREGOV_SYNC_TO
 interface SyncLease {
   scanId: string;
   cursor: TransferegovScanCursor | null;
-  coverage: { pagesRead?: number; pagesAvailable?: number; groupsCompleted?: string[]; yearsInScope?: number[] };
+  coverage: { pagesRead?: number; pagesAvailable?: number; groupPageTotals?: Record<string, number>; yearsComplete?: number[]; yearsInScope?: number[] };
 }
 interface SyncCommit { changed: number; deactivated: number; scanId: string; }
 const PAGE_BUDGET_PER_RUN = 4;
@@ -94,10 +94,19 @@ export async function handleTransferegovSync(
     const previous = lease.coverage ?? {};
     // pagesAvailable is an estimate until the entire scan completes; avoid presenting
     // it as the exact total of all groups in scope.
+    const groupPageTotals = {
+      ...(previous as { groupPageTotals?: Record<string, number> }).groupPageTotals,
+      ...slice.result.coverage.groupPageTotals,
+    };
     const coverage = {
       ...slice.result.coverage,
+      groupPageTotals,
       pagesRead: (previous.pagesRead ?? 0) + slice.result.coverage.pagesRead,
-      pagesAvailable: (previous.pagesAvailable ?? 0) + slice.result.coverage.pagesAvailable,
+      pagesAvailable: Object.values(groupPageTotals).reduce((sum, count) => sum + count, 0),
+      yearsComplete: [...new Set([
+        ...((previous as { yearsComplete?: number[] }).yearsComplete ?? []),
+        ...slice.result.coverage.yearsComplete,
+      ])].sort((a, b) => b - a),
       exhaustive: slice.cursor === null,
       scanId: lease.scanId,
     };
