@@ -47,6 +47,7 @@ export async function handleOpportunitiesRequest(
     const start = (page - 1) * PAGE_SIZE;
     const params = new URLSearchParams({
       select: "source_id,opportunity_id,title,source_name,source_url,official_url,program_code,agency,executing_agency,legal_nature,proposal_start,deadline,deadline_state,deadline_status,public_call_state,eligibility_status,eligibility_criteria,first_seen_at,last_seen_at,updated_at",
+      is_active: "eq.true",
       deadline_state: "eq.open",
       deadline: `gte.${brazilToday()}`,
       order: "deadline.asc",
