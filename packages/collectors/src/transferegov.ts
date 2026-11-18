@@ -51,6 +51,7 @@ export interface TransferegovOpportunity extends Opportunity {
   executingAgency: string | null;
   naturezaJuridica: string | null;
   eligibilityStatus: "not_assessed";
+  sourceAvailable: boolean;
   eligibilityCriteria: string | null;
   proposalStart: string | null;
   deadlineState: DeadlineState;
@@ -135,6 +136,7 @@ export function normalizeTransferegovProgram(
     executingAgency: program.orgao_executor,
     naturezaJuridica: program.natureza_juridica_programa,
     eligibilityStatus: "not_assessed",
+    sourceAvailable: program.sit_programa === "DISPONIBILIZADO" && hasVoluntaryProposal(program),
     eligibilityCriteria: program.criterios_de_selecao,
     proposalStart: deadline.verification === "confirmed" ? program.dt_prog_ini_receb_prop : null,
     deadlineState: deadline.state,
@@ -235,6 +237,20 @@ function makeQueryUrl(group: QueryGroup, page: number, baseUrl: string): URL {
     tamanho_da_pagina: String(PAGE_SIZE),
   }).toString();
   return url;
+}
+
+/** Observe every record returned by the official query, including shortened/expired dates.
+ * Only the presentation layer filters to open opportunities. */
+export function normalizeObservedTransferegovPrograms(
+  programs: TransferegovProgram[], today: string, observedAt: string,
+): TransferegovOpportunity[] {
+  const unique = new Map<string, TransferegovOpportunity>();
+  for (const program of programs) {
+    if (!TARGET_LEGAL_NATURES.has(program.natureza_juridica_programa ?? "") || program.uf_programa !== "RJ") continue;
+    const item = normalizeTransferegovProgram(program, today, observedAt);
+    unique.set(item.id, item);
+  }
+  return [...unique.values()];
 }
 
 /** Fetches a bounded slice of the historical scan and returns a resumable cursor. */
