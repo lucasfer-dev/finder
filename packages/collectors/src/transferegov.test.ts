@@ -5,6 +5,7 @@ import {
   buildOfficialApiUrl,
   classifyDeadline,
   fetchOpenTransferegovPrograms,
+  fetchTransferegovSlice,
   normalizeOpenTransferegovPrograms,
   normalizeTransferegovProgram,
   type TransferegovPage,
@@ -102,6 +103,25 @@ describe("adaptador Transferegov", () => {
     expect(result.coverage.pagesRead).toBe(2);
     expect(result.coverage.pagesAvailable).toBe(8);
     expect(result.coverage.partialReasons.some((reason) => reason.includes("cobertura limitada"))).toBe(true);
+  });
+
+  it("retoma a sincronização histórica do cursor sem reconsultar grupos concluídos", async () => {
+    const visited: URL[] = [];
+    const mockFetch = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      visited.push(url);
+      return new Response(JSON.stringify(page([], 1)), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    const first = await fetchTransferegovSlice({ today, maxPages: 1, fetchImpl: mockFetch });
+    const second = await fetchTransferegovSlice({ today: "2027-01-03", cursor: first.cursor, maxPages: 1, fetchImpl: mockFetch });
+    const third = await fetchTransferegovSlice({ today: "2027-01-03", cursor: second.cursor, maxPages: 1, fetchImpl: mockFetch });
+    expect(first.cursor).toMatchObject({ yearIndex: 0, natureIndex: 1, page: 1 });
+    expect(second.cursor).toMatchObject({ yearIndex: 1, natureIndex: 0, page: 1 });
+    expect(visited[0]?.searchParams.get("ano_disponibilizacao")).toBe("2026");
+    expect(visited[1]?.searchParams.get("ano_disponibilizacao")).toBe("2026");
+    expect(visited[2]?.searchParams.get("ano_disponibilizacao")).toBe("2025");
+    expect(third.result.coverage.yearsComplete).toEqual([2026]);
+    expect(first.cursor?.baseYear).toBe(2026);
   });
 
   it("tenta novamente falhas temporárias e conclui a consulta", async () => {

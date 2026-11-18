@@ -183,6 +183,14 @@ async function mapConcurrent<T, R>(items: T[], concurrency: number, callback: (i
   return output;
 }
 
+export interface TransferegovScanCursor {
+  baseYear: number;
+  yearIndex: number;
+  natureIndex: number;
+  page: number;
+  totalPages: number | null;
+}
+
 interface QueryGroup {
   year: number;
   legalNature: string;
@@ -206,6 +214,70 @@ function makeQueryUrl(group: QueryGroup, page: number, baseUrl: string): URL {
     tamanho_da_pagina: String(PAGE_SIZE),
   }).toString();
   return url;
+}
+
+/** Fetches a bounded slice of the historical scan and returns a resumable cursor. */
+export async function fetchTransferegovSlice(options: {
+  today: string;
+  cursor?: TransferegovScanCursor | null;
+  maxPages?: number;
+  fetchImpl?: typeof fetch;
+  baseUrl?: string;
+}): Promise<{ result: TransferegovSearchResult; cursor: TransferegovScanCursor | null }> {
+  const fetchImpl = options.fetchImpl ?? fetch;
+  const baseUrl = options.baseUrl ?? API_URL;
+  const currentYear = Number(options.today.slice(0, 4));
+  const initialCursor = options.cursor ?? { baseYear: currentYear, yearIndex: 0, natureIndex: 0, page: 1, totalPages: null };
+  const baseYear = initialCursor.baseYear ?? currentYear;
+  const yearsInScope = Array.from({ length: HISTORICAL_LOOKBACK_YEARS + 1 }, (_, index) => baseYear - index);
+  const legalNatures = [...TARGET_LEGAL_NATURES];
+  const groups = yearsInScope.flatMap((year) => legalNatures.map((legalNature) => ({ year, legalNature })));
+  const maxPages = Math.max(1, options.maxPages ?? 4);
+  let cursor: TransferegovScanCursor = initialCursor;
+  const records: TransferegovProgram[] = [];
+  let pagesRead = 0;
+  let pagesAvailable = 0;
+  const pageCountsByGroup = new Map<string, number>();
+
+  while (cursor.yearIndex < yearsInScope.length && pagesRead < maxPages) {
+    const group = groups[cursor.yearIndex * legalNatures.length + cursor.natureIndex];
+    if (!group) break;
+    const page = await fetchPage(makeQueryUrl(group, cursor.page, baseUrl), fetchImpl);
+    records.push(...page.data);
+    pagesRead += 1;
+    const groupKey = `${group.year}:${group.legalNature}`;
+    if (cursor.page === 1 && !pageCountsByGroup.has(groupKey)) {
+      pageCountsByGroup.set(groupKey, page.total_pages);
+      pagesAvailable += page.total_pages;
+    }
+    const totalPages = cursor.totalPages ?? page.total_pages;
+    if (cursor.page < totalPages) {
+      cursor = { ...cursor, page: cursor.page + 1, totalPages };
+    } else {
+      const nextNatureIndex = cursor.natureIndex + 1;
+      const nextYearIndex = nextNatureIndex >= legalNatures.length ? cursor.yearIndex + 1 : cursor.yearIndex;
+      cursor = nextYearIndex >= yearsInScope.length
+        ? { ...cursor, yearIndex: yearsInScope.length, natureIndex: 0, page: 1, totalPages: null }
+        : { baseYear, yearIndex: nextYearIndex, natureIndex: nextNatureIndex % legalNatures.length, page: 1, totalPages: null };
+    }
+  }
+
+  const complete = cursor.yearIndex >= yearsInScope.length;
+  const partialReasons = complete ? [] : [`Sincronização retomável: próxima consulta em ${yearsInScope[cursor.yearIndex]} / ${legalNatures[cursor.natureIndex]}, página ${cursor.page}.`];
+  return {
+    result: {
+      opportunities: normalizeOpenTransferegovPrograms(records, options.today, new Date().toISOString()),
+      coverage: {
+        yearsInScope,
+        yearsComplete: complete ? yearsInScope : yearsInScope.slice(0, cursor.yearIndex),
+        pagesRead,
+        pagesAvailable,
+        exhaustive: complete,
+        partialReasons,
+      },
+    },
+    cursor: complete ? null : cursor,
+  };
 }
 
 export async function fetchOpenTransferegovPrograms(options: {

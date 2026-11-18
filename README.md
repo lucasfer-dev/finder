@@ -38,7 +38,7 @@ pnpm build
 - `apps/web`: interface Vite, React e Tailwind CSS.
 - `packages/core`: tipos, schemas e regras compartilhadas, sem APIs exclusivas do Node.
 - `packages/collectors`: contratos dos adaptadores de fontes e tarefas de coleta em Node.
-- `supabase`: futura configuração, migrações e políticas do banco.
+- `supabase`: migrações, políticas e instruções de configuração do banco.
 
 ## API Transferegov
 
@@ -49,5 +49,13 @@ pnpm build
 - A busca alcança seis anos-calendário (atual + cinco anteriores). Cada grupo ano/natureza lê até 3 páginas de 200 linhas; o payload informa páginas consultadas, páginas disponíveis, anos completos e motivos de cobertura parcial.
 - A Function mantém snapshot fresco no cache da Cloudflare por até 6 horas quando exaustivo (5 minutos se parcial), preserva snapshot de contingência por 7 dias e serve stale com aviso se a API falhar. O Cache API é local ao ponto de presença; uma região sem cache pode executar uma busca fria.
 - `pnpm dev` constrói a interface e executa `wrangler pages dev`, para que `/api/transferegov` rode no runtime Pages durante o desenvolvimento. `pnpm dev:vite` é apenas o servidor Vite e não executa a Function.
+
+## Persistência e busca
+
+A busca de tela usa `/api/opportunities`, que lê oportunidades normalizadas no Supabase, permite filtrar por palavra-chave, órgão e natureza jurídica de referência e exclui prazos encerrados conforme a data de Brasília. A natureza jurídica é apenas um filtro de triagem e não confirma elegibilidade.
+
+A rota protegida `POST /api/transferegov/sync` consulta páginas em lotes de quatro, salva cada lote e avança um cursor persistido. Continue chamando enquanto o status for `partial`; quando retornar `complete`, a janela histórica foi percorrida. Os registros e as observações ficam nas tabelas `opportunities`, `opportunity_history` e `source_sync_state`.
+
+Para aplicar o banco e configurar variáveis/segredos no servidor, siga [`supabase/README.md`](supabase/README.md). A interface ainda não terá resultados até que a migração, secrets e a primeira sincronização sejam configurados.
 
 Não configure credenciais no código. Use variáveis de ambiente; o arquivo `.env.example` contém apenas nomes de variáveis.
