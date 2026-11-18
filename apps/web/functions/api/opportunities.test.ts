@@ -42,6 +42,7 @@ describe("GET /api/opportunities", () => {
     expect(urls[0]?.searchParams.get("agency")).toBe("ilike.*Ciência*");
     expect(urls[0]?.searchParams.get("or")).toContain("inovação");
     expect(urls[0]?.searchParams.get("deadline_state")).toBe("eq.open");
+    expect(urls[0]?.searchParams.get("is_active")).toBe("eq.true");
     expect(new Headers(fetchImpl.mock.calls[0]?.[1]?.headers).get("apikey")).toBe("server-secret");
   });
 
