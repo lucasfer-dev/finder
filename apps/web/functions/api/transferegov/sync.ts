@@ -124,7 +124,7 @@ export async function handleTransferegovSync(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           p_source_id: SOURCE_ID,
-          p_lease_owner: leaseId,
+          p_lease_id: leaseId,
           p_scan_id: claim.scanId,
           p_rows: slice.result.opportunities.map(toDatabaseRow),
           p_cursor: slice.cursor,
@@ -151,7 +151,7 @@ export async function handleTransferegovSync(
         await supabaseRequest(env, "rpc/radar_fail_sync", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_owner: leaseId, p_message: message }),
+          body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_id: leaseId, p_message: message }),
         }, fetchImpl);
       } catch { /* A lease expires automatically if the database is unavailable. */ }
     }
