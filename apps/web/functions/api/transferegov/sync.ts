@@ -6,24 +6,46 @@ import {
 } from "@radar/collectors/transferegov";
 import { getSupabaseConfig, supabaseRequest, type SupabaseEnv } from "../../_shared/supabase.js";
 
-interface Context { request: Request; env?: SupabaseEnv & { TRANSFEREGOV_SYNC_TOKEN?: string; TRANSFEREGOV_API_URL?: string }; }
-interface SyncLease {
+interface Context {
+  request: Request;
+  env?: SupabaseEnv & { TRANSFEREGOV_SYNC_TOKEN?: string; TRANSFEREGOV_API_URL?: string };
+}
+interface SyncClaim {
   scanId: string;
   cursor: TransferegovScanCursor | null;
-  coverage: { pagesRead?: number; pagesAvailable?: number; groupPageTotals?: Record<string, number>; yearsComplete?: number[]; yearsInScope?: number[] };
+  coverage: { pagesRead?: number; pagesAvailable?: number; yearsComplete?: number[] } | null;
 }
-interface SyncCommit { changed: number; deactivated: number; scanId: string; }
+interface DatabaseOpportunity {
+  source_id: string;
+  opportunity_id: string;
+  title: string;
+  source_name: string;
+  source_url: string;
+  official_url: string;
+  program_code: string | null;
+  agency: string | null;
+  executing_agency: string | null;
+  legal_nature: string | null;
+  proposal_start: string | null;
+  deadline: string | null;
+  deadline_state: string;
+  deadline_status: string;
+  public_call_state: string;
+  eligibility_status: string;
+  eligibility_criteria: string | null;
+  source_data: TransferegovOpportunity;
+}
+
 const PAGE_BUDGET_PER_RUN = 4;
 const SOURCE_ID = transferegovAdapter.id;
-const LEASE_SECONDS = 600;
 
 function brazilToday(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
 }
 
-function toDatabaseRow(item: TransferegovOpportunity) {
-  const isActive = item.activeInSource;
+function toDatabaseRow(item: TransferegovOpportunity): DatabaseOpportunity {
   return {
+    source_id: SOURCE_ID,
     opportunity_id: item.id,
     title: item.title,
     source_name: item.sourceName,
@@ -41,24 +63,12 @@ function toDatabaseRow(item: TransferegovOpportunity) {
     eligibility_status: item.eligibilityStatus,
     eligibility_criteria: item.eligibilityCriteria,
     source_data: item,
-    is_active: isActive,
-    inactive_reason: isActive ? null
-      : item.deadlineState !== "open" ? "deadline_" + item.deadlineState
-      : item.sourceSituation !== "DISPONIBILIZADO" ? "source_unavailable"
-      : "not_voluntary",
   };
 }
 
-async function rpc<T>(env: SupabaseEnv, name: string, args: object, fetchImpl: typeof fetch): Promise<T> {
-  const { data } = await supabaseRequest<T>(env, "rpc/" + name, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-  }, fetchImpl);
-  return data;
-}
-
 export async function handleTransferegovSync(
-  context: Context, fetchImpl: typeof fetch = fetch,
+  context: Context,
+  fetchImpl: typeof fetch = fetch,
 ): Promise<Response> {
   const env = context.env ?? {};
   if (context.request.method !== "POST") {
@@ -70,75 +80,76 @@ export async function handleTransferegovSync(
   if (context.request.headers.get("Authorization") !== `Bearer ${env.TRANSFEREGOV_SYNC_TOKEN}`) {
     return Response.json({ error: "Não autorizado." }, { status: 401, headers: { "Cache-Control": "no-store" } });
   }
-  const leaseOwner = crypto.randomUUID();
-  let leaseAcquired = false;
+  const leaseId = crypto.randomUUID();
+  let claimed = false;
   try {
     getSupabaseConfig(env);
-    // The PostgreSQL function locks the state row, preventing concurrent cursor advances.
-    const lease = await rpc<SyncLease | null>(env, "acquire_source_sync", {
-      p_source_id: SOURCE_ID, p_lease_owner: leaseOwner, p_lease_seconds: LEASE_SECONDS,
+    // PostgreSQL conditionally updates one state row: competing callers cannot both own the scan.
+    const { data: claim } = await supabaseRequest<SyncClaim | null>(env, "rpc/radar_claim_sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_id: leaseId }),
     }, fetchImpl);
-    if (!lease) {
-      return Response.json({ error: "Já existe sincronização em andamento." }, {
-        status: 409, headers: { "Cache-Control": "no-store" },
-      });
-    }
-    leaseAcquired = true;
+    if (!claim) return Response.json({ error: "Já existe uma execução em andamento." }, {
+      status: 409, headers: { "Cache-Control": "no-store" },
+    });
+    claimed = true;
     const slice = await fetchTransferegovSlice({
       today: brazilToday(),
-      cursor: lease.cursor,
+      cursor: claim.cursor,
       maxPages: PAGE_BUDGET_PER_RUN,
       baseUrl: env.TRANSFEREGOV_API_URL,
       fetchImpl,
     });
-    const previous = lease.coverage ?? {};
-    // pagesAvailable is an estimate until the entire scan completes; avoid presenting
-    // it as the exact total of all groups in scope.
-    const groupPageTotals = {
-      ...(previous as { groupPageTotals?: Record<string, number> }).groupPageTotals,
-      ...slice.result.coverage.groupPageTotals,
-    };
+    const previous = claim.coverage ?? {};
+    const previousComplete = previous.yearsComplete ?? [];
+    const yearsComplete = [...new Set([...previousComplete, ...slice.result.coverage.yearsComplete])].sort((a, b) => b - a);
     const coverage = {
       ...slice.result.coverage,
-      groupPageTotals,
+      yearsComplete,
       pagesRead: (previous.pagesRead ?? 0) + slice.result.coverage.pagesRead,
-      pagesAvailable: Object.values(groupPageTotals).reduce((sum, count) => sum + count, 0),
-      yearsComplete: [...new Set([
-        ...((previous as { yearsComplete?: number[] }).yearsComplete ?? []),
-        ...slice.result.coverage.yearsComplete,
-      ])].sort((a, b) => b - a),
+      pagesAvailable: (previous.pagesAvailable ?? 0) + slice.result.coverage.pagesAvailable,
       exhaustive: slice.cursor === null,
-      scanId: lease.scanId,
     };
-    const rows = slice.result.opportunities.map(toDatabaseRow);
-    // Single database transaction: check lease ownership, upsert rows,
-    // log only changes, reconcile missing rows only on completed scans,
-    // and advance cursor atomically.
-    const outcome = await rpc<SyncCommit>(env, "commit_source_sync_batch", {
-      p_source_id: SOURCE_ID,
-      p_lease_owner: leaseOwner,
-      p_rows: rows,
-      p_cursor: slice.cursor,
-      p_coverage: coverage,
-      p_complete: slice.cursor === null,
-    }, fetchImpl);
-    leaseAcquired = false;
+    // All changes (including expired dates), audit rows, cursor and final withdrawal
+    // are committed by one PostgreSQL transaction under the same lease.
+    const { data: committed } = await supabaseRequest<{ changed: number; withdrawn: number }>(
+      env, "rpc/radar_commit_sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_source_id: SOURCE_ID,
+          p_lease_id: leaseId,
+          p_scan_id: claim.scanId,
+          p_rows: slice.result.opportunities.map(toDatabaseRow),
+          p_cursor: slice.cursor,
+          p_coverage: coverage,
+          p_complete: slice.cursor === null,
+        }),
+      }, fetchImpl,
+    );
     return Response.json({
-      sourceId: SOURCE_ID, status: slice.cursor === null ? "complete" : "partial",
-      cursor: slice.cursor, coverage, upserted: rows.length,
-      changes: outcome.changed, deactivated: outcome.deactivated,
+      sourceId: SOURCE_ID,
+      status: slice.cursor ? "partial" : "complete",
+      cursor: slice.cursor,
+      coverage,
+      observed: slice.result.opportunities.length,
+      changed: committed.changed,
+      withdrawn: committed.withdrawn,
       updatedAt: new Date().toISOString(),
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida durante a sincronização.";
-    if (leaseAcquired) {
+    if (claimed) {
       try {
-        await rpc(env, "fail_source_sync", {
-          p_source_id: SOURCE_ID, p_lease_owner: leaseOwner, p_error: message,
+        await supabaseRequest(env, "rpc/radar_fail_sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ p_source_id: SOURCE_ID, p_lease_id: leaseId, p_message: message }),
         }, fetchImpl);
-      } catch { /* Preserve original error; the lease also expires automatically. */ }
+      } catch { /* A lease expires automatically if the database is unavailable. */ }
     }
-    return Response.json({ error: message, sourceId: SOURCE_ID }, {
+    return Response.json({ error: "Não foi possível concluir a sincronização.", sourceId: SOURCE_ID }, {
       status: 502, headers: { "Cache-Control": "no-store" },
     });
   }
