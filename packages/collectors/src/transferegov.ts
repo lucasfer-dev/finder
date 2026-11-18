@@ -246,6 +246,7 @@ export async function fetchTransferegovSlice(options: {
   maxPages?: number;
   fetchImpl?: typeof fetch;
   baseUrl?: string;
+  knownGroupTotals?: Record<string, number>;
 }): Promise<{ result: TransferegovSearchResult; cursor: TransferegovScanCursor | null }> {
   const fetchImpl = options.fetchImpl ?? fetch;
   const baseUrl = options.baseUrl ?? API_URL;
@@ -260,7 +261,7 @@ export async function fetchTransferegovSlice(options: {
   const records: TransferegovProgram[] = [];
   let pagesRead = 0;
   let pagesAvailable = 0;
-  const pageCountsByGroup = new Map<string, number>();
+  const pageCountsByGroup = new Map<string, number>(Object.entries(options.knownGroupTotals ?? {}));
 
   while (cursor.yearIndex < yearsInScope.length && pagesRead < maxPages) {
     const group = groups[cursor.yearIndex * legalNatures.length + cursor.natureIndex];
