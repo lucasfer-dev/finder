@@ -143,6 +143,7 @@ export async function handleTransferegovSync(
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Falha desconhecida durante a sincronização.";
+    console.warn("Radar sync failure:", message);
     if (claimed) {
       try {
         await supabaseRequest(env, "rpc/fail_source_sync", {
