@@ -55,6 +55,9 @@ export interface TransferegovOpportunity extends Opportunity {
   proposalStart: string | null;
   deadlineState: DeadlineState;
   publicCallState: PublicCallState;
+  sourceSituation: string | null;
+  qualification: string | null;
+  activeInSource: boolean;
 }
 
 export interface TransferegovCoverage {
@@ -135,7 +138,24 @@ export function normalizeTransferegovProgram(
     proposalStart: deadline.verification === "confirmed" ? program.dt_prog_ini_receb_prop : null,
     deadlineState: deadline.state,
     publicCallState,
+    sourceSituation: program.sit_programa,
+    qualification: program.qualificacao_proposta,
+    activeInSource: program.sit_programa === "DISPONIBILIZADO" && hasVoluntaryProposal(program) && deadline.state === "open",
   };
+}
+
+/** Keep closed and future-dated source rows for reconciliation; the UI still filters active rows. */
+export function normalizeTransferegovObservedPrograms(
+  programs: TransferegovProgram[], today: string, discoveredAt: string,
+): TransferegovOpportunity[] {
+  const unique = new Map<string, TransferegovOpportunity>();
+  for (const program of programs) {
+    if (!TARGET_LEGAL_NATURES.has(program.natureza_juridica_programa ?? "")) continue;
+    if (program.uf_programa !== "RJ") continue;
+    const record = normalizeTransferegovProgram(program, today, discoveredAt);
+    unique.set(record.id, record);
+  }
+  return [...unique.values()];
 }
 
 export function normalizeOpenTransferegovPrograms(
@@ -266,7 +286,7 @@ export async function fetchTransferegovSlice(options: {
   const partialReasons = complete ? [] : [`Sincronização retomável: próxima consulta em ${yearsInScope[cursor.yearIndex]} / ${legalNatures[cursor.natureIndex]}, página ${cursor.page}.`];
   return {
     result: {
-      opportunities: normalizeOpenTransferegovPrograms(records, options.today, new Date().toISOString()),
+      opportunities: normalizeTransferegovObservedPrograms(records, options.today, new Date().toISOString()),
       coverage: {
         yearsInScope,
         yearsComplete: complete ? yearsInScope : yearsInScope.slice(0, cursor.yearIndex),
