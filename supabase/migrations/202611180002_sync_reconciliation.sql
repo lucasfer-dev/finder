@@ -142,3 +142,39 @@ revoke all on function public.fail_source_sync(text,uuid,text) from public, anon
 grant execute on function public.acquire_source_sync(text,uuid,integer) to service_role;
 grant execute on function public.commit_source_sync_batch(text,uuid,jsonb,jsonb,jsonb,boolean) to service_role;
 grant execute on function public.fail_source_sync(text,uuid,text) to service_role;
+
+-- Compatibility API: the deployed Pages Function uses radar_* RPC names.
+-- Delegate to the same fenced transactional implementation above.
+create or replace function public.radar_claim_sync(
+  p_source_id text, p_lease_id uuid
+) returns jsonb language sql security invoker set search_path = '' as $$
+  select public.acquire_source_sync(p_source_id, p_lease_id, 600);
+$$;
+
+create or replace function public.radar_commit_sync(
+  p_source_id text, p_lease_id uuid, p_scan_id uuid, p_rows jsonb,
+  p_cursor jsonb, p_coverage jsonb, p_complete boolean
+) returns jsonb language plpgsql security invoker set search_path = '' as $$
+declare current_scan uuid;
+begin
+  select scan_id into current_scan from public.source_sync_state
+    where source_id=p_source_id and lease_owner=p_lease_id;
+  if current_scan is distinct from p_scan_id then
+    raise exception 'Scan identifier mismatch';
+  end if;
+  return public.commit_source_sync_batch(
+    p_source_id,p_lease_id,p_rows,p_cursor,p_coverage,p_complete);
+end $$;
+
+create or replace function public.radar_fail_sync(
+  p_source_id text, p_lease_id uuid, p_message text
+) returns boolean language sql security invoker set search_path = '' as $$
+  select public.fail_source_sync(p_source_id,p_lease_id,p_message);
+$$;
+
+revoke all on function public.radar_claim_sync(text,uuid) from public, anon, authenticated;
+revoke all on function public.radar_commit_sync(text,uuid,uuid,jsonb,jsonb,jsonb,boolean) from public, anon, authenticated;
+revoke all on function public.radar_fail_sync(text,uuid,text) from public, anon, authenticated;
+grant execute on function public.radar_claim_sync(text,uuid) to service_role;
+grant execute on function public.radar_commit_sync(text,uuid,uuid,jsonb,jsonb,jsonb,boolean) to service_role;
+grant execute on function public.radar_fail_sync(text,uuid,text) to service_role;
