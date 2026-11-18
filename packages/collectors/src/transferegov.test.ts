@@ -7,6 +7,7 @@ import {
   fetchOpenTransferegovPrograms,
   fetchTransferegovSlice,
   normalizeOpenTransferegovPrograms,
+  normalizeTransferegovObservedPrograms,
   normalizeTransferegovProgram,
   type TransferegovPage,
   type TransferegovProgram,
@@ -61,6 +62,23 @@ describe("adaptador Transferegov", () => {
     expect(normalizeOpenTransferegovPrograms([otherAudience], today, fetchedAt)).toEqual([]);
     const accepted = normalizeOpenTransferegovPrograms([openProgram], today, fetchedAt);
     expect(accepted[0]?.eligibilityStatus).toBe("not_assessed");
+  });
+
+  it("persiste registros expirados e retificados para desativação, sem expô-los como abertos", () => {
+    const withdrawn = { ...openProgram, sit_programa: "CANCELADO" };
+    const shortened = { ...openProgram, id_programa: 9876, dt_prog_fim_receb_prop: "2026-11-13" };
+    const observed = normalizeTransferegovObservedPrograms([withdrawn, shortened], today, fetchedAt);
+    expect(observed).toHaveLength(2);
+    expect(observed.every((item) => !item.activeInSource)).toBe(true);
+    expect(observed.find((item) => item.id.includes("9876"))?.deadlineState).toBe("expired");
+    expect(normalizeOpenTransferegovPrograms([withdrawn, shortened], today, fetchedAt)).toHaveLength(0);
+  });
+
+  it("marca reabertura após retificação como fonte ativa, mantendo elegibilidade não verificada", () => {
+    const reopened = { ...expiredProgram, dt_prog_fim_receb_prop: "2026-12-31" };
+    const [item] = normalizeTransferegovObservedPrograms([reopened], today, fetchedAt);
+    expect(item.activeInSource).toBe(true);
+    expect(item.eligibilityStatus).toBe("not_assessed");
   });
 
   it("monta uma consulta técnica válida pelo id aceito na OpenAPI", () => {
