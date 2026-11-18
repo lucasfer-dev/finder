@@ -37,7 +37,7 @@ function createDbMock(options: {
     const url = new URL(String(input));
     if (url.hostname === "db.example") {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-      if (url.pathname.endsWith("/rpc/acquire_source_sync")) {
+      if (url.pathname.endsWith("/rpc/radar_claim_sync")) {
         if (state.claimed) return Response.json(null);
         state.claimed = true;
         if (state.status === "complete" || state.status === "idle") {
@@ -48,16 +48,16 @@ function createDbMock(options: {
         state.status = "running";
         return Response.json({ scanId: state.scanId, cursor: state.cursor, coverage: state.coverage });
       }
-      if (url.pathname.endsWith("/rpc/commit_source_sync_batch")) {
+      if (url.pathname.endsWith("/rpc/radar_commit_sync")) {
         const commit = body as unknown as typeof commits[number] & { p_cursor: ScanCursor | null };
         commits.push(commit);
         state.cursor = commit.p_cursor;
         state.coverage = commit.p_coverage;
         state.status = commit.p_complete ? "complete" : "partial";
         state.claimed = false;
-        return Response.json({ changed: commit.p_rows.length, deactivated: commit.p_complete ? 1 : 0 });
+        return Response.json({ changed: commit.p_rows.length, withdrawn: commit.p_complete ? 1 : 0 });
       }
-      if (url.pathname.endsWith("/rpc/fail_source_sync")) {
+      if (url.pathname.endsWith("/rpc/radar_fail_sync")) {
         state.status = "failed";
         state.claimed = false;
         return Response.json(true);
