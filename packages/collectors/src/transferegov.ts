@@ -65,6 +65,7 @@ export interface TransferegovCoverage {
   yearsComplete: number[];
   pagesRead: number;
   pagesAvailable: number;
+  groupPageTotals?: Record<string, number>;
   exhaustive: boolean;
   partialReasons: string[];
 }
@@ -266,9 +267,10 @@ export async function fetchTransferegovSlice(options: {
     records.push(...page.data);
     pagesRead += 1;
     const groupKey = `${group.year}:${group.legalNature}`;
-    if (cursor.page === 1 && !pageCountsByGroup.has(groupKey)) {
-      pageCountsByGroup.set(groupKey, page.total_pages);
-      pagesAvailable += page.total_pages;
+    if (!pageCountsByGroup.has(groupKey)) {
+      const available = cursor.totalPages ?? page.total_pages;
+      pageCountsByGroup.set(groupKey, available);
+      pagesAvailable += available;
     }
     const totalPages = cursor.totalPages ?? page.total_pages;
     if (cursor.page < totalPages) {
@@ -292,6 +294,7 @@ export async function fetchTransferegovSlice(options: {
         yearsComplete: complete ? yearsInScope : yearsInScope.slice(0, cursor.yearIndex),
         pagesRead,
         pagesAvailable,
+        groupPageTotals: Object.fromEntries(pageCountsByGroup),
         exhaustive: complete,
         partialReasons,
       },
