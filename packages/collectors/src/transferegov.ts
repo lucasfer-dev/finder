@@ -239,20 +239,6 @@ function makeQueryUrl(group: QueryGroup, page: number, baseUrl: string): URL {
   return url;
 }
 
-/** Observe every record returned by the official query, including shortened/expired dates.
- * Only the presentation layer filters to open opportunities. */
-export function normalizeObservedTransferegovPrograms(
-  programs: TransferegovProgram[], today: string, observedAt: string,
-): TransferegovOpportunity[] {
-  const unique = new Map<string, TransferegovOpportunity>();
-  for (const program of programs) {
-    if (!TARGET_LEGAL_NATURES.has(program.natureza_juridica_programa ?? "") || program.uf_programa !== "RJ") continue;
-    const item = normalizeTransferegovProgram(program, today, observedAt);
-    unique.set(item.id, item);
-  }
-  return [...unique.values()];
-}
-
 /** Fetches a bounded slice of the historical scan and returns a resumable cursor. */
 export async function fetchTransferegovSlice(options: {
   today: string;
@@ -283,7 +269,7 @@ export async function fetchTransferegovSlice(options: {
     records.push(...page.data);
     pagesRead += 1;
     const groupKey = `${group.year}:${group.legalNature}`;
-    if (!pageCountsByGroup.has(groupKey)) {
+    if (!pageCountsByGroup.has(groupKey) && cursor.page === 1) {
       const available = cursor.totalPages ?? page.total_pages;
       pageCountsByGroup.set(groupKey, available);
       pagesAvailable += available;
