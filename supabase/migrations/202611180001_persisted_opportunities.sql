@@ -129,7 +129,8 @@ begin
       raise exception 'Wrong source_id in batch';
     end if;
     fingerprint := md5(((item->'source_data') - 'discoveredAt')::text);
-    visible := item->>'deadline_state' = 'open';
+    visible := item->>'deadline_state' = 'open'
+      and coalesce((item->'source_data'->>'sourceAvailable')::boolean, false);
     reason := case when visible then null else coalesce(item->>'deadline_state','unknown') end;
     select content_fingerprint, is_active into old_fingerprint, old_active
       from public.opportunities
