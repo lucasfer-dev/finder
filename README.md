@@ -54,7 +54,7 @@ pnpm build
 
 A busca de tela usa `/api/opportunities`, que lê oportunidades normalizadas no Supabase, permite filtrar por palavra-chave, órgão e natureza jurídica de referência e exclui prazos encerrados conforme a data de Brasília. A natureza jurídica é apenas um filtro de triagem e não confirma elegibilidade.
 
-A rota protegida `POST /api/transferegov/sync` consulta páginas em lotes de quatro, salva cada lote e avança um cursor persistido. Continue chamando enquanto o status for `partial`; quando retornar `complete`, a janela histórica foi percorrida. Os registros e as observações ficam nas tabelas `opportunities`, `opportunity_history` e `source_sync_state`.
+A rota protegida `POST /api/transferegov/sync` consulta páginas em lotes de quatro, salva cada lote e avança um cursor persistido. O cursor preserva o ano-base da busca para que uma sincronização iniciada em dezembro continue na mesma janela histórica após a virada do ano. Continue chamando enquanto o status for `partial`; quando retornar `complete`, a janela histórica foi percorrida. Os registros e as observações ficam nas tabelas `opportunities`, `opportunity_history` e `source_sync_state`.
 
 Para aplicar o banco e configurar variáveis/segredos no servidor, siga [`supabase/README.md`](supabase/README.md). A interface ainda não terá resultados até que a migração, secrets e a primeira sincronização sejam configurados.
 
