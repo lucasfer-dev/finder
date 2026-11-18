@@ -5,7 +5,9 @@ import {
   buildOfficialApiUrl,
   classifyDeadline,
   fetchOpenTransferegovPrograms,
+  fetchTransferegovSlice,
   normalizeOpenTransferegovPrograms,
+  normalizeTransferegovObservedPrograms,
   normalizeTransferegovProgram,
   type TransferegovPage,
   type TransferegovProgram,
@@ -62,6 +64,23 @@ describe("adaptador Transferegov", () => {
     expect(accepted[0]?.eligibilityStatus).toBe("not_assessed");
   });
 
+  it("persiste registros expirados e retificados para desativação, sem expô-los como abertos", () => {
+    const withdrawn = { ...openProgram, sit_programa: "CANCELADO" };
+    const shortened = { ...openProgram, id_programa: 9876, dt_prog_fim_receb_prop: "2026-11-13" };
+    const observed = normalizeTransferegovObservedPrograms([withdrawn, shortened], today, fetchedAt);
+    expect(observed).toHaveLength(2);
+    expect(observed.every((item) => !item.activeInSource)).toBe(true);
+    expect(observed.find((item) => item.id.includes("9876"))?.deadlineState).toBe("expired");
+    expect(normalizeOpenTransferegovPrograms([withdrawn, shortened], today, fetchedAt)).toHaveLength(0);
+  });
+
+  it("marca reabertura após retificação como fonte ativa, mantendo elegibilidade não verificada", () => {
+    const reopened = { ...expiredProgram, dt_prog_fim_receb_prop: "2026-12-31" };
+    const [item] = normalizeTransferegovObservedPrograms([reopened], today, fetchedAt);
+    expect(item.activeInSource).toBe(true);
+    expect(item.eligibilityStatus).toBe("not_assessed");
+  });
+
   it("monta uma consulta técnica válida pelo id aceito na OpenAPI", () => {
     const url = new URL(buildOfficialApiUrl(56385));
     expect(url.origin).toBe("https://api-publica.transferegov.gestao.gov.br");
@@ -104,6 +123,25 @@ describe("adaptador Transferegov", () => {
     expect(result.coverage.partialReasons.some((reason) => reason.includes("cobertura limitada"))).toBe(true);
   });
 
+  it("retoma a sincronização histórica do cursor sem reconsultar grupos concluídos", async () => {
+    const visited: URL[] = [];
+    const mockFetch = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      visited.push(url);
+      return new Response(JSON.stringify(page([], 1)), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    const first = await fetchTransferegovSlice({ today, maxPages: 1, fetchImpl: mockFetch });
+    const second = await fetchTransferegovSlice({ today: "2027-01-03", cursor: first.cursor, maxPages: 1, fetchImpl: mockFetch });
+    const third = await fetchTransferegovSlice({ today: "2027-01-03", cursor: second.cursor, maxPages: 1, fetchImpl: mockFetch });
+    expect(first.cursor).toMatchObject({ yearIndex: 0, natureIndex: 1, page: 1 });
+    expect(second.cursor).toMatchObject({ yearIndex: 1, natureIndex: 0, page: 1 });
+    expect(visited[0]?.searchParams.get("ano_disponibilizacao")).toBe("2026");
+    expect(visited[1]?.searchParams.get("ano_disponibilizacao")).toBe("2026");
+    expect(visited[2]?.searchParams.get("ano_disponibilizacao")).toBe("2025");
+    expect(third.result.coverage.yearsComplete).toEqual([2026]);
+    expect(first.cursor?.baseYear).toBe(2026);
+  });
+
   it("tenta novamente falhas temporárias e conclui a consulta", async () => {
     let calls = 0;
     const mockFetch = vi.fn<typeof fetch>().mockImplementation(async () => {
@@ -121,4 +159,23 @@ describe("adaptador Transferegov", () => {
     await expect(fetchOpenTransferegovPrograms({ today, fetchImpl: mockFetch, lookbackYears: 0, maxPagesPerQuery: 1 })).rejects.toThrow("HTTP 400");
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
+  it("não duplica páginas disponíveis ao retomar no meio do mesmo grupo", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async (input) => {
+      const url = new URL(String(input));
+      const total = url.searchParams.get("ano_disponibilizacao") === "2026"
+        && url.searchParams.get("natureza_juridica_programa") === "Organização da Sociedade Civil" ? 6 : 1;
+      return Response.json(page([], total));
+    });
+    const first = await fetchTransferegovSlice({ today, maxPages: 2, fetchImpl });
+    expect(first.result.coverage.pagesRead).toBe(2);
+    expect(first.result.coverage.pagesAvailable).toBe(6);
+    const second = await fetchTransferegovSlice({
+      today, cursor: first.cursor, knownGroupTotals: first.result.coverage.groupPageTotals,
+      maxPages: 2, fetchImpl,
+    });
+    expect(second.result.coverage.pagesRead).toBe(2);
+    expect(second.result.coverage.pagesAvailable).toBe(0);
+    expect(first.result.coverage.pagesAvailable + second.result.coverage.pagesAvailable).toBe(6);
+  });
+
 });

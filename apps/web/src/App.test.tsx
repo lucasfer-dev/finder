@@ -18,7 +18,8 @@ describe("HomePage", () => {
     expect(html).toContain("Radar de Editais");
     expect(html).toContain("SEPEC");
     expect(html).toContain("Oportunidades abertas");
-    expect(html).toContain("Consultando programas com prazo aberto na fonte oficial");
+    expect(html).toContain("Painel de oportunidades");
+    expect(html).toContain("Consultando oportunidades persistidas");
     expect(html).not.toContain("Edital fictício");
   });
 });
